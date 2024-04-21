@@ -7,7 +7,9 @@ import challonge
 from datetime import datetime, timezone, timedelta
 import sqlite3
 
+from aiogram.types import FSInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.utils.media_group import MediaGroupBuilder
 
 BOT_TOKEN = "6965505332:AAEUx-z2iBk2bEe6fizyuqlnT7AEfoh0ha8"
 
@@ -19,7 +21,8 @@ challonge.set_credentials("Sla1mer", "zVCFWkhItCVtQ2mUOFSbeBBsEQdbwbI36652E5g7")
 participants = challonge.participants.index(TOURNAMENT_ID)
 
 # Создание словаря для хранения названий команд
-team_names = {participant["group_player_ids"][0]: participant["name"] for participant in participants}
+team_names = {participant["id"]: participant["name"] for participant in participants}
+print(participants)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -72,7 +75,8 @@ async def cmd_start(message: types.Message):
 async def cmd_main_menu(message: types.Message):
     kb = [
         [types.KeyboardButton(text="Сделать прогноз")],
-        [types.KeyboardButton(text="Посмотреть историю своих прогнозов")]
+        [types.KeyboardButton(text="Посмотреть историю своих прогнозов")],
+        [types.KeyboardButton(text="Помощь")]
     ]
 
     keyboard = types.ReplyKeyboardMarkup(
@@ -83,6 +87,42 @@ async def cmd_main_menu(message: types.Message):
 
     await message.answer("Выберите действие:", reply_markup=keyboard)
 
+@dp.message(F.text.lower() == "помощь")
+async def cmd_help(message: types.Message):
+    album_builder = MediaGroupBuilder(
+        caption=""" 
+     <b>*Примечание*</b>
+1. Для ставки, в телеграмме у вас должен быть ТЕГ (@username)
+2. Ставки нельзя отменять, поэтому выбирайте с умом.
+3. Ставки во время матчей отключаются.
+4. В ставках отображаются только те матчи, которые будут играться в сегодняшний день.
+
+<b>*Как пользоваться*</b>
+Чтобы начать поставить ставку с помощью бота, выполните следующие шаги:
+1. Нажмите кнопку "Сделать прогноз", чтобы начать взаимодействие с ботом.
+2. Дальше выберите прогноз, который вас интересует.
+3. Выберите команду, которая по вашему мнению выиграет.
+4. Если у вас возникнут вопросы, отправьте сообщение нашему администратору (@Sla1mer).
+     """
+    )
+    album_builder.add(
+        type="photo",
+        media=FSInputFile("img.png")
+    )
+    album_builder.add(
+        type="photo",
+        media=FSInputFile("img2.png")
+    )
+    album_builder.add(
+        type="photo",
+        media=FSInputFile("img3.png")
+    )
+
+    await message.answer_media_group(
+        media=album_builder.build()
+    )
+    await cmd_main_menu(message)
+
 @dp.message(F.text.lower() == "посмотреть историю своих прогнозов")
 async def cmd_check_history_forecast(message: types.Message):
     matches = get_user_forecasts(message.from_user.username)
@@ -91,8 +131,6 @@ async def cmd_check_history_forecast(message: types.Message):
 
     for match in matches:
         info_match = challonge.matches.show(TOURNAMENT_ID, match)
-        print(info_match)
-        print()
 
         player1_name = team_names.get(info_match["player1_id"], "Unknown")
         player2_name = team_names.get(info_match["player2_id"], "Unknown")
@@ -122,6 +160,8 @@ async def cmd_forecast_menu(message: types.Message):
     now = datetime.now()
     now = now.astimezone(timezone(timedelta(hours=2)))
 
+    print(matches)
+
     scheduled_matches = [match for match in matches if
                          match.get("scheduled_time") is not None and
                          match.get("scheduled_time").date() == now.date() and
@@ -131,7 +171,6 @@ async def cmd_forecast_menu(message: types.Message):
 
     user_name = message.from_user.username
     user_forecasts = get_user_forecasts(user_name)
-    print(get_user_forecasts(user_name))
 
     buttons = []
     for match in scheduled_matches:
